@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gioco Spaziale con Razzi Esplosivi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(to bottom, #0a0a2a, #1a1a4a);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            border: 2px solid #4a9eff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.5);
+        }
+        
+        #game-canvas {
+            background: radial-gradient(circle at center, #0a0a2a, #000011);
+            display: block;
+        }
+        
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+        
+        .ui-panel {
+            background: rgba(10, 10, 42, 0.7);
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: 1px solid #4a9eff;
+        }
+        
+        #level-indicator {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4a9eff;
+        }
+        
+        #score-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffcc00;
+        }
+        
+        #special-weapon {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff5500;
+        }
+        
+        #start-screen, #level-complete, #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 20, 0.85);
+            z-index: 10;
+        }
+        
+        #level-complete, #game-over {
+            display: none;
+        }
+        
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #4a9eff;
+            text-shadow: 0 0 10px rgba(74, 158, 255, 0.7);
+        }
+        
+        h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #ffcc00;
+        }
+        
+        p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 80%;
+            line-height: 1.5;
+        }
+        
+        .btn {
+            background: linear-gradient(to bottom, #4a9eff, #2a5aaa);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 15px rgba(74, 158, 255, 0.5);
+        }
+        
+        .btn:hover {
+            background: linear-gradient(to bottom, #5aaeff, #3a6aba);
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.7);
+        }
+        
+        .controls-info {
+            margin-top: 20px;
+            background: rgba(74, 158, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .controls-info h3 {
+            margin-bottom: 10px;
+            color: #ffcc00;
+        }
+        
+        .upgrade-info {
+            margin-top: 15px;
+            background: rgba(255, 204, 0, 0.2);
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .upgrade-info h3 {
+            color: #ffcc00;
+            margin-bottom: 5px;
+        }
+        
+        .ship-evolution {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .ship-stage {
+            text-align: center;
+            margin: 0 15px;
+        }
+        
+        .ship-stage.active {
+            transform: scale(1.1);
+        }
+        
+        .ship-icon {
+            width: 60px;
+            height: 80px;
+            margin: 0 auto 10px;
+            background: linear-gradient(to bottom, #4a9eff, #2a5aaa);
+            clip-path: polygon(50% 0%, 100% 30%, 80% 100%, 20% 100%, 0% 30%);
+        }
+        
+        .ship-stage.active .ship-icon {
+            background: linear-gradient(to bottom, #ffcc00, #ff8800);
+            box-shadow: 0 0 15px rgba(255, 204, 0, 0.7);
+        }
+        
+        #double-space-indicator {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 85, 0, 0.7);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas" width="800" height="600"></canvas>
+        
+        <div id="ui-overlay">
+            <div class="ui-panel">
+                <div id="level-indicator">LIVELLO: 1</div>
+            </div>
+            <div class="ui-panel">
+                <div id="score-display">PUNTEGGIO: 0</div>
+            </div>
+            <div class="ui-panel">
+                <div id="special-weapon">RAZZI: 0</div>
+            </div>
+        </div>
+        
+        <div id="double-space-indicator">PREMI DI NUOVO SPAZIO PER IL RAZZO ESPLOSIVO!</div>
+        
+        <div id="start-screen">
+            <h1>MISSIONE SPAZIALE EVOLUTIVA</h1>
+            <p>Guida la tua navicella attraverso i crateri spaziali.<br>
+               Distruggi le rocce per sbloccare razzi speciali e potenziare la tua navicella!<br>
+               <strong>DOPPIO SPAZIO</strong> per lanciare razzi esplosivi!</p>
+            
+            <div class="ship-evolution">
+                <div class="ship-stage">
+                    <div class="ship-icon"></div>
+                    <div>LIVELLO 1</div>
+                </div>
+                <div class="ship-stage">
+                    <div class="ship-icon"></div>
+                    <div>LIVELLO 2</div>
+                </div>
+                <div class="ship-stage">
+                    <div class="ship-icon"></div>
+                    <div>LIVELLO 3</div>
+                </div>
+            </div>
+            
+            <button id="start-btn" class="btn">INIZIA MISSIONE</button>
+            <div class="controls-info">
+                <h3>CONTROLLI</h3>
+                <p>↑↓←→ : Muovi la navicella<br>SPAZIO : Sparare raggi<br><strong>DOPPIO SPAZIO</strong> : Razzi esplosivi (quando disponibili)</p>
+            </div>
+            <div class="upgrade-info">
+                <h3>EVOLUZIONE NAVICELLA</h3>
+                <p>Ad ogni livello: Raggi più potenti + Nuove abilità</p>
+            </div>
+        </div>
+        
+        <div id="level-complete">
+            <h2>LIVELLO COMPLETATO!</h2>
+            <p id="level-complete-text">La tua navicella si è evoluta! Nuovi potenziamenti disponibili.</p>
+            <button id="next-level-btn" class="btn">LIVELLO SUCCESSIVO</button>
+        </div>
+        
+        <div id="game-over">
+            <h2>MISSIONE FALLITA</h2>
+            <p id="game-over-text">La tua navicella è stata distrutta!</p>
+            <button id="restart-btn" class="btn">RIPROVA</button>
+        </div>
+    </div>
+
+    <script>
+        // Elementi del gioco
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('start-screen');
+        const levelCompleteScreen = document.getElementById('level-complete');
+        const gameOverScreen = document.getElementById('game-over');
+        const startBtn = document.getElementById('start-btn');
+        const nextLevelBtn = document.getElementById('next-level-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const levelIndicator = document.getElementById('level-indicator');
+        const scoreDisplay = document.getElementById('score-display');
+        const specialWeaponDisplay = document.getElementById('special-weapon');
+        const levelCompleteText = document.getElementById('level-complete-text');
+        const gameOverText = document.getElementById('game-over-text');
+        const doubleSpaceIndicator = document.getElementById('double-space-indicator');
+        
+        // Variabili di gioco
+        let gameActive = false;
+        let currentLevel = 1;
+        let score = 0;
+        let rocksDestroyed = 0;
+        let specialRockets = 0;
+        let player;
+        let bullets = [];
+        let specialRocketsArray = [];
+        let rocks = [];
+        let stars = [];
+        let particles = [];
+        let keys = {};
+        let lastSpacePress = 0;
+        let doubleSpaceActive = false;
+        let doubleSpaceTimeout = null;
+        
+        // Configurazione dei livelli
+        const levels = {
+            1: {
+                rocks: 12,
+                rockHealth: 3,
+                playerSpeed: 5,
+                bgColor: '#0a0a2a',
+                bulletSpeed: 10,
+                bulletDamage: 1,
+                specialRocketsUnlock: 5
+            },
+            2: {
+                rocks: 18,
+                rockHealth: 5,
+                playerSpeed: 5,
+                bgColor: '#1a0a2a',
+                bulletSpeed: 12,
+                bulletDamage: 1,
+                specialRocketsUnlock: 8
+            },
+            3: {
+                rocks: 25,
+                rockHealth: 7,
+                playerSpeed: 5,
+                bgColor: '#2a0a1a',
+                bulletSpeed: 15,
+                bulletDamage: 2,
+                specialRocketsUnlock: 12
+            }
+        };
+        
+        // Classe per la navicella del giocatore
+        class Player {
+            constructor() {
+                this.width = 40;
+                this.height = 60;
+                this.x = canvas.width / 2 - this.width / 2;
+                this.y = canvas.height - this.height - 20;
+                this.speed = levels[currentLevel].playerSpeed;
+                this.color = '#4a9eff';
+                this.health = 100;
+                this.shootCooldown = 0;
+                this.specialCooldown = 0;
+                this.bulletType = 'normal';
+            }
+            
+            draw() {
+                // Corpo principale della navicella - si evolve con i livelli
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                
+                if (currentLevel === 1) {
+                    // Navicella base
+                    ctx.moveTo(this.x + this.width / 2, this.y);
+                    ctx.lineTo(this.x + this.width, this.y + this.height / 2);
+                    ctx.lineTo(this.x + this.width / 2, this.y + this.height);
+                    ctx.lineTo(this.x, this.y + this.height / 2);
+                } else if (currentLevel === 2) {
+                    // Navicella livello 2 - più aerodinamica
+                    ctx.moveTo(this.x + this.width / 2, this.y);
+                    ctx.lineTo(this.x + this.width, this.y + this.height / 3);
+                    ctx.lineTo(this.x + this.width * 0.8, this.y + this.height);
+                    ctx.lineTo(this.x + this.width / 2, this.y + this.height * 0.8);
+                    ctx.lineTo(this.x + this.width * 0.2, this.y + this.height);
+                    ctx.lineTo(this.x, this.y + this.height / 3);
+                } else {
+                    // Navicella livello 3 - avanzata
+                    ctx.moveTo(this.x + this.width / 2, this.y);
+                    ctx.lineTo(this.x + this.width, this.y + this.height / 4);
+                    ctx.lineTo(this.x + this.width * 0.9, this.y + this.height / 2);
+                    ctx.lineTo(this.x + this.width, this.y + this.height * 0.7);
+                    ctx.lineTo(this.x + this.width * 0.7, this.y + this.height);
+                    ctx.lineTo(this.x + this.width / 2, this.y + this.height * 0.9);
+                    ctx.lineTo(this.x + this.width * 0.3, this.y + this.height);
+                    ctx.lineTo(this.x, this.y + this.height * 0.7);
+                    ctx.lineTo(this.x + this.width * 0.1, this.y + this.height / 2);
+                    ctx.lineTo(this.x, this.y + this.height / 4);
+                }
+                
+                ctx.closePath();
+                ctx.fill();
+                
+                // Cabina di pilotaggio - cambia colore con l'evoluzione
+                let cockpitColor = '#aaddff';
+                if (currentLevel >= 2) cockpitColor = '#ddffaa';
+                if (currentLevel >= 3) cockpitColor = '#ffddaa';
+                
+                ctx.fillStyle = cockpitColor;
+                ctx.beginPath();
+                ctx.arc(this.x + this.width / 2, this.y + this.height / 2, 10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Propulsori - aumentano con l'evoluzione
+                ctx.fillStyle = '#ff5500';
+                if (currentLevel === 1) {
+                    ctx.fillRect(this.x + 5, this.y + this.height, this.width / 4, 10);
+                    ctx.fillRect(this.x + this.width - this.width / 4 - 5, this.y + this.height, this.width / 4, 10);
+                } else if (currentLevel === 2) {
+                    ctx.fillRect(this.x, this.y + this.height, this.width / 5, 10);
+                    ctx.fillRect(this.x + this.width / 4, this.y + this.height, this.width / 5, 10);
+                    ctx.fillRect(this.x + this.width * 0.55, this.y + this.height, this.width / 5, 10);
+                    ctx.fillRect(this.x + this.width * 0.8, this.y + this.height, this.width / 5, 10);
+                } else {
+                    ctx.fillRect(this.x, this.y + this.height, this.width / 6, 12);
+                    ctx.fillRect(this.x + this.width / 5, this.y + this.height, this.width / 6, 12);
+                    ctx.fillRect(this.x + this.width * 0.45, this.y + this.height, this.width / 6, 12);
+                    ctx.fillRect(this.x + this.width * 0.65, this.y + this.height, this.width / 6, 12);
+                    ctx.fillRect(this.x + this.width * 0.85, this.y + this.height, this.width / 6, 12);
+                }
+                
+                // Effetto fiamma dai propulsori
+                if (gameActive) {
+                    let flameColor = '#ffcc00';
+                    if (currentLevel >= 2) flameColor = '#ffaa00';
+                    if (currentLevel >= 3) flameColor = '#ff8800';
+                    
+                    ctx.fillStyle = flameColor;
+                    if (currentLevel === 1) {
+                        ctx.fillRect(this.x + 7, this.y + this.height + 10, this.width / 6, 8);
+                        ctx.fillRect(this.x + this.width - this.width / 6 - 7, this.y + this.height + 10, this.width / 6, 8);
+                    } else if (currentLevel === 2) {
+                        ctx.fillRect(this.x + 2, this.y + this.height + 10, this.width / 7, 8);
+                        ctx.fillRect(this.x + this.width / 4 + 2, this.y + this.height + 10, this.width / 7, 8);
+                        ctx.fillRect(this.x + this.width * 0.55 + 2, this.y + this.height + 10, this.width / 7, 8);
+                        ctx.fillRect(this.x + this.width * 0.8 + 2, this.y + this.height + 10, this.width / 7, 8);
+                    } else {
+                        ctx.fillRect(this.x + 2, this.y + this.height + 10, this.width / 8, 10);
+                        ctx.fillRect(this.x + this.width / 5 + 2, this.y + this.height + 10, this.width / 8, 10);
+                        ctx.fillRect(this.x + this.width * 0.45 + 2, this.y + this.height + 10, this.width / 8, 10);
+                        ctx.fillRect(this.x + this.width * 0.65 + 2, this.y + this.height + 10, this.width / 8, 10);
+                        ctx.fillRect(this.x + this.width * 0.85 + 2, this.y + this.height + 10, this.width / 8, 10);
+                    }
+                }
+                
+                // Ali o armi aggiuntive per livelli avanzati
+                if (currentLevel >= 2) {
+                    ctx.fillStyle = this.color;
+                    // Ali
+                    ctx.fillRect(this.x - 15, this.y + this.height / 3, 15, 5);
+                    ctx.fillRect(this.x + this.width, this.y + this.height / 3, 15, 5);
+                    
+                    if (currentLevel >= 3) {
+                        // Armi aggiuntive
+                        ctx.fillStyle = '#ff5555';
+                        ctx.fillRect(this.x - 10, this.y + this.height / 2, 10, 5);
+                        ctx.fillRect(this.x + this.width, this.y + this.height / 2, 10, 5);
+                    }
+                }
+            }
+            
+            update() {
+                // Movimento
+                if (keys['ArrowLeft'] && this.x > 0) {
+                    this.x -= this.speed;
+                }
+                if (keys['ArrowRight'] && this.x < canvas.width - this.width) {
+                    this.x += this.speed;
+                }
+                if (keys['ArrowUp'] && this.y > 0) {
+                    this.y -= this.speed;
+                }
+                if (keys['ArrowDown'] && this.y < canvas.height - this.height) {
+                    this.y += this.speed;
+                }
+                
+                // Sparare raggi
+                if (this.shootCooldown > 0) {
+                    this.shootCooldown--;
+                }
+                
+                // Gestione del doppio spazio per razzi speciali
+                if (keys[' '] && this.shootCooldown === 0) {
+                    const now = Date.now();
+                    
+                    // Se è passato meno di 300ms dall'ultimo spazio
+                    if (now - lastSpacePress < 300 && specialRockets > 0) {
+                        // Doppio spazio rilevato - lancia razzo speciale
+                        this.shootSpecial();
+                        lastSpacePress = 0; // Reset
+                        clearTimeout(doubleSpaceTimeout);
+                        doubleSpaceActive = false;
+                        doubleSpaceIndicator.style.display = 'none';
+                    } else {
+                        // Sparo normale
+                        this.shoot();
+                        lastSpacePress = now;
+                        
+                        // Mostra indicatore per il doppio spazio
+                        if (specialRockets > 0) {
+                            doubleSpaceActive = true;
+                            doubleSpaceIndicator.style.display = 'block';
+                            
+                            // Nascondi l'indicatore dopo un po'
+                            clearTimeout(doubleSpaceTimeout);
+                            doubleSpaceTimeout = setTimeout(() => {
+                                doubleSpaceActive = false;
+                                doubleSpaceIndicator.style.display = 'none';
+                            }, 500);
+                        }
+                    }
+                    
+                    this.shootCooldown = 15 - currentLevel * 2; // Più veloce ai livelli alti
+                }
+            }
+            
+            shoot() {
+                const bulletConfig = levels[currentLevel];
+                
+                if (currentLevel === 1) {
+                    // Livello 1: singolo proiettile
+                    bullets.push(new Bullet(this.x + this.width / 2, this.y, bulletConfig));
+                } else if (currentLevel === 2) {
+                    // Livello 2: doppio proiettile
+                    bullets.push(new Bullet(this.x + this.width / 3, this.y, bulletConfig));
+                    bullets.push(new Bullet(this.x + 2 * this.width / 3, this.y, bulletConfig));
+                } else {
+                    // Livello 3: triplo proiettile
+                    bullets.push(new Bullet(this.x + this.width / 4, this.y, bulletConfig));
+                    bullets.push(new Bullet(this.x + this.width / 2, this.y, bulletConfig));
+                    bullets.push(new Bullet(this.x + 3 * this.width / 4, this.y, bulletConfig));
+                }
+            }
+            
+            shootSpecial() {
+                if (specialRockets > 0) {
+                    specialRocketsArray.push(new SpecialRocket(this.x + this.width / 2, this.y));
+                    specialRockets--;
+                    specialWeaponDisplay.textContent = `RAZZI: ${specialRockets}`;
+                    
+                    // Effetto visivo per il lancio del razzo
+                    for (let i = 0; i < 15; i++) {
+                        particles.push(new Particle(
+                            this.x + this.width / 2, 
+                            this.y + this.height, 
+                            '#ff5500',
+                            2
+                        ));
+                    }
+                }
+            }
+        }
+        
+        // Classe per i proiettili normali
+        class Bullet {
+            constructor(x, y, config) {
+                this.x = x;
+                this.y = y;
+                this.width = 4 + (config.bulletDamage - 1) * 2;
+                this.height = 12 + (config.bulletDamage - 1) * 3;
+                this.speed = config.bulletSpeed;
+                this.damage = config.bulletDamage;
+                this.color = currentLevel === 1 ? '#ffcc00' : 
+                             currentLevel === 2 ? '#00ffcc' : '#ff00cc';
+            }
+            
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - this.width / 2, this.y, this.width, this.height);
+                
+                // Effetto luce - cambia con l'evoluzione
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(this.x - 1, this.y, 2, 4);
+                
+                // Effetto particellare per livelli avanzati
+                if (currentLevel >= 2) {
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y + this.height, this.width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                if (currentLevel >= 3) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y + this.height, this.width / 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            update() {
+                this.y -= this.speed;
+                return this.y < 0;
+            }
+        }
+        
+        // Classe per i razzi speciali
+        class SpecialRocket {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 12;
+                this.height = 20;
+                this.speed = 8;
+                this.color = '#ff5500';
+                this.trailParticles = [];
+            }
+            
+            draw() {
+                // Corpo del razzo
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                ctx.lineTo(this.x - this.width / 2, this.y + this.height);
+                ctx.lineTo(this.x + this.width / 2, this.y + this.height);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Testa del razzo
+                ctx.fillStyle = '#ffcc00';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Ala del razzo
+                ctx.fillStyle = '#ff8800';
+                ctx.fillRect(this.x - this.width, this.y + this.height / 2, this.width, 4);
+                ctx.fillRect(this.x, this.y + this.height / 2, this.width, 4);
+                
+                // Scia
+                for (let i = 0; i < this.trailParticles.length; i++) {
+                    const p = this.trailParticles[i];
+                    ctx.fillStyle = `rgba(255, ${100 + p.life * 5}, 0, ${p.life / 20})`;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            update() {
+                this.y -= this.speed;
+                
+                // Aggiungi particelle alla scia
+                if (Math.random() < 0.7) {
+                    this.trailParticles.push({
+                        x: this.x + (Math.random() - 0.5) * 10,
+                        y: this.y + this.height + Math.random() * 10,
+                        size: Math.random() * 3 + 1,
+                        life: 20
+                    });
+                }
+                
+                // Aggiorna particelle della scia
+                for (let i = this.trailParticles.length - 1; i >= 0; i--) {
+                    this.trailParticles[i].life--;
+                    if (this.trailParticles[i].life <= 0) {
+                        this.trailParticles.splice(i, 1);
+                    }
+                }
+                
+                return this.y < -this.height;
+            }
+            
+            explode() {
+                // Crea una grande esplosione
+                for (let i = 0; i < 50; i++) {
+                    particles.push(new Particle(
+                        this.x, 
+                        this.y, 
+                        '#ff5500',
+                        5
+                    ));
+                }
+                
+                // Effetto onda d'urto
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.3)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 80, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Distruggi tutte le rocce nell'area
+                const explosionRadius = 100;
+                for (let i = rocks.length - 1; i >= 0; i--) {
+                    const dx = rocks[i].x - this.x;
+                    const dy = rocks[i].y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < explosionRadius + rocks[i].radius) {
+                        // Aggiungi punti per la roccia distrutta
+                        score += 30; // Più punti per l'esplosione
+                        rocksDestroyed++;
+                        scoreDisplay.textContent = `PUNTEGGIO: ${score}`;
+                        
+                        // Crea particelle di esplosione
+                        for (let j = 0; j < 15; j++) {
+                            particles.push(new Particle(
+                                rocks[i].x, 
+                                rocks[i].y, 
+                                '#ff9900',
+                                3
+                            ));
+                        }
+                        
+                        rocks.splice(i, 1);
+                    }
+                }
+                
+                // Controlla se abbiamo sbloccato nuovi razzi speciali
+                checkSpecialRocketsUnlock();
+            }
+        }
+        
+        // Classe per le rocce
+        class Rock {
+            constructor() {
+                this.radius = 25 + Math.random() * 25;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = Math.random() * (canvas.height / 2) + 50;
+                this.health = levels[currentLevel].rockHealth;
+                this.maxHealth = this.health;
+                this.color = '#663300';
+                this.speedX = (Math.random() - 0.5) * 2;
+                this.speedY = (Math.random() - 0.5) * 2;
+            }
+            
+            draw() {
+                // Roccia principale
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Dettagli della roccia
+                ctx.fillStyle = '#442200';
+                ctx.beginPath();
+                ctx.arc(this.x - this.radius / 3, this.y - this.radius / 4, this.radius / 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = '#552200';
+                ctx.beginPath();
+                ctx.arc(this.x + this.radius / 4, this.y + this.radius / 3, this.radius / 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Barra della salute
+                const barWidth = this.radius * 1.5;
+                const barHeight = 5;
+                const barX = this.x - barWidth / 2;
+                const barY = this.y - this.radius - 10;
+                
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+                
+                ctx.fillStyle = this.health > this.maxHealth / 2 ? '#00ff00' : '#ff0000';
+                ctx.fillRect(barX, barY, barWidth * (this.health / this.maxHealth), barHeight);
+            }
+            
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                
+                // Rimbalzo dai bordi
+                if (this.x < this.radius || this.x > canvas.width - this.radius) {
+                    this.speedX *= -1;
+                }
+                if (this.y < this.radius || this.y > canvas.height / 2) {
+                    this.speedY *= -1;
+                }
+            }
+        }
+        
+        // Classe per le stelle di sfondo
+        class Star {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2;
+                this.speed = Math.random() * 0.5;
+                this.brightness = Math.random();
+            }
+            
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.brightness})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            update() {
+                this.y += this.speed;
+                if (this.y > canvas.height) {
+                    this.y = 0;
+                    this.x = Math.random() * canvas.width;
+                }
+                
+                // Effetto scintillio
+                this.brightness = 0.5 + Math.sin(Date.now() * 0.001 + this.x) * 0.5;
+            }
+        }
+        
+        // Classe per le particelle degli effetti
+        class Particle {
+            constructor(x, y, color, sizeMultiplier = 1) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 3 * sizeMultiplier + 1;
+                this.speedX = Math.random() * 6 - 3;
+                this.speedY = Math.random() * 6 - 3;
+                this.color = color;
+                this.life = 30;
+            }
+            
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life--;
+                
+                return this.life <= 0;
+            }
+        }
+        
+        // Controlla se sono stati sbloccati nuovi razzi speciali
+        function checkSpecialRocketsUnlock() {
+            const rocksNeeded = levels[currentLevel].specialRocketsUnlock;
+            if (rocksDestroyed >= rocksNeeded && specialRockets < 3) {
+                specialRockets++;
+                rocksDestroyed = 0; // Reset per il prossimo razzo
+                specialWeaponDisplay.textContent = `RAZZI: ${specialRockets}`;
+                
+                // Effetto visivo per lo sblocco
+                for (let i = 0; i < 20; i++) {
+                    particles.push(new Particle(
+                        canvas.width - 50, 
+                        30, 
+                        '#ff5500',
+                        2
+                    ));
+                }
+            }
+        }
+        
+        // Inizializzazione del gioco
+        function initGame() {
+            player = new Player();
+            bullets = [];
+            specialRocketsArray = [];
+            rocks = [];
+            particles = [];
+            rocksDestroyed = 0;
+            lastSpacePress = 0;
+            doubleSpaceActive = false;
+            
+            // Crea le rocce in base al livello
+            for (let i = 0; i < levels[currentLevel].rocks; i++) {
+                rocks.push(new Rock());
+            }
+            
+            // Crea le stelle di sfondo
+            stars = [];
+            for (let i = 0; i < 100; i++) {
+                stars.push(new Star());
+            }
+            
+            // Aggiorna l'UI
+            levelIndicator.textContent = `LIVELLO: ${currentLevel}`;
+            scoreDisplay.textContent = `PUNTEGGIO: ${score}`;
+            specialWeaponDisplay.textContent = `RAZZI: ${specialRockets}`;
+            
+            // Aggiorna la visualizzazione dell'evoluzione della navicella
+            document.querySelectorAll('.ship-stage').forEach((stage, index) => {
+                if (index < currentLevel) {
+                    stage.classList.add('active');
+                } else {
+                    stage.classList.remove('active');
+                }
+            });
+        }
+        
+        // Loop principale del gioco
+        function gameLoop() {
+            if (!gameActive) return;
+            
+            // Pulisci il canvas
+            ctx.fillStyle = levels[currentLevel].bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Disegna e aggiorna le stelle
+            stars.forEach(star => {
+                star.update();
+                star.draw();
+            });
+            
+            // Aggiorna e disegna il giocatore
+            player.update();
+            player.draw();
+            
+            // Aggiorna e disegna i proiettili
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                if (bullets[i].update()) {
+                    bullets.splice(i, 1);
+                } else {
+                    bullets[i].draw();
+                }
+            }
+            
+            // Aggiorna e disegna i razzi speciali
+            for (let i = special
